@@ -1,11 +1,13 @@
 package service
 
-import "database/sql"
+import (
+	"github.com/impulse-http/local-backend/pkg/database"
+)
 
 type Service struct {
-	db *sql.DB
+	DB *database.Database
 }
 
-func NewService(db *sql.DB) *Service {
-	return &Service{db: db}
+func NewService(db *database.Database) *Service {
+	return &Service{DB: db}
 }
