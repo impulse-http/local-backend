@@ -22,11 +22,13 @@ CREATE TABLE headers_values
 
 CREATE TABLE headers
 (
-    id         INTEGER PRIMARY KEY,
-    key        text,
-    request_id INTEGER,
-    is_request INTEGER,
-    FOREIGN KEY (request_id) REFERENCES requests_history (id)
+    id                 INTEGER PRIMARY KEY,
+    key                text,
+    request_history_id INTEGER,
+    request_id         INTEGER,
+    is_request         INTEGER,
+    FOREIGN KEY (request_history_id) REFERENCES requests_history (id),
+    FOREIGN KEY (request_id) REFERENCES requests (id)
 );
 
 CREATE TABLE requests_history
@@ -40,6 +42,15 @@ CREATE TABLE requests_history
     FOREIGN KEY (user_id) REFERENCES user (id)
 );
 
+CREATE TABLE requests
+(
+    id           INTEGER PRIMARY KEY,
+    name         text,
+    request_body blob,
+    user_id      INTEGER,
+    created_at   timestamp,
+    method       string
+);
 -- +goose StatementEnd
 
 -- +goose Down

@@ -3,7 +3,7 @@ package requests
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/impulse-http/local-backend/pkg"
+	"github.com/impulse-http/local-backend/pkg/models"
 	"github.com/impulse-http/local-backend/pkg/service"
 	"io/ioutil"
 	"log"
@@ -12,23 +12,25 @@ import (
 )
 
 type CallRequest struct {
-	Request pkg.RequestType `json:"request"`
+	Request models.RequestType `json:"request"`
 }
 
 type CallResponse struct {
-	Id       int64            `json:"id"`
-	Response pkg.ResponseType `json:"response"`
+	Id       int64               `json:"id"`
+	Response models.ResponseType `json:"response"`
 }
 
+// MakeRequestSendHandler create a handler that make a call to api and save it to history
 func MakeRequestSendHandler(s *service.Service) service.Handler {
 	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
 		body, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			log.Println(err)
 			service.WriteJSONError(w, "failed to read body", 500)
 			return
 		}
-		log.Println(string(body))
+
 		var requestJson CallRequest
 		if err := json.Unmarshal(body, &requestJson); err != nil {
 			log.Println(err)
@@ -56,12 +58,12 @@ func MakeRequestSendHandler(s *service.Service) service.Handler {
 		if _, err := buf.ReadFrom(response.Body); err != nil {
 			return
 		}
-		res := pkg.ResponseType{
+		res := models.ResponseType{
 			Headers: response.Header,
 			Body:    buf.String(),
 		}
 
-		id, err := s.DB.CreateHistoryEntry(&requestJson.Request, &res)
+		id, err := s.DB.CreateHistoryEntry(ctx, &requestJson.Request, &res)
 		if err != nil {
 			log.Println(err)
 			service.WriteJSONError(w, "error while inserting to database", 500)

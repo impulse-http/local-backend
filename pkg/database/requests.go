@@ -1,23 +1,33 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-	"github.com/impulse-http/local-backend/pkg"
+	"github.com/impulse-http/local-backend/pkg/models"
 	"log"
 	"net/http"
 	"time"
 )
 
-func insertHeadersValues(db *sql.DB, rid int64, headers map[string][]string, isRequest bool) error {
-	for name, values := range headers {
-		r, err := db.Exec(
-			`
+func insertHeadersValues(ctx context.Context, db *sql.DB, requestHistoryId, requestId int64, headers map[string][]string, isRequest bool) error {
+	query := `
+			INSERT INTO headers (key, request_history_id, is_request)
+			VALUES ($1, $2, $3);
+	`
+	writeId := requestHistoryId
+	if requestId > 0 {
+		query = `
 			INSERT INTO headers (key, request_id, is_request)
 			VALUES ($1, $2, $3);
-			`,
+		`
+		writeId = requestId
+	}
+	for name, values := range headers {
+		r, err := db.ExecContext(ctx,
+			query,
 			name,
-			rid,
+			writeId,
 			boolToInt(isRequest),
 		)
 
@@ -34,7 +44,7 @@ func insertHeadersValues(db *sql.DB, rid int64, headers map[string][]string, isR
 		}
 
 		for _, value := range values {
-			r, err = db.Exec(
+			r, err = db.ExecContext(ctx,
 				`
 			INSERT INTO headers_values (header_id, header_value)
 			VALUES ($1, $2);
@@ -53,9 +63,9 @@ func insertHeadersValues(db *sql.DB, rid int64, headers map[string][]string, isR
 	return nil
 }
 
-func (d *Database) CreateHistoryEntry(req *pkg.RequestType, res *pkg.ResponseType) (int64, error) {
+func (d *Database) CreateHistoryEntry(ctx context.Context, req *models.RequestType, res *models.ResponseType) (int64, error) {
 	db := d.db
-	r, err := db.Exec(
+	r, err := db.ExecContext(ctx,
 		`
 		INSERT INTO requests_history (request_body, response_body, user_id, created_at, method)
 		VALUES ($1, $2, 1, $3, $4)
@@ -75,12 +85,12 @@ func (d *Database) CreateHistoryEntry(req *pkg.RequestType, res *pkg.ResponseTyp
 		return 0, err
 	}
 
-	err = insertHeadersValues(db, id, req.Headers, true)
+	err = insertHeadersValues(ctx, db, id, 0, req.Headers, true)
 	if err != nil {
 		return id, err
 	}
 
-	err = insertHeadersValues(db, id, res.Headers, false)
+	err = insertHeadersValues(ctx, db, id, 0, res.Headers, false)
 	if err != nil {
 		return id, err
 	}
@@ -88,7 +98,7 @@ func (d *Database) CreateHistoryEntry(req *pkg.RequestType, res *pkg.ResponseTyp
 	return id, nil
 }
 
-func (d *Database) GetHistory() ([]RequestHistoryEntry, error) {
+func (d *Database) GetHistory(ctx context.Context) ([]models.RequestHistoryEntry, error) {
 	type rawHistory struct {
 		Id           int64
 		Method       string
@@ -100,19 +110,19 @@ func (d *Database) GetHistory() ([]RequestHistoryEntry, error) {
 		HeaderValue  string
 	}
 
-	newHistoryEntry := func() RequestHistoryEntry {
-		entry := RequestHistoryEntry{}
+	newHistoryEntry := func() models.RequestHistoryEntry {
+		entry := models.RequestHistoryEntry{}
 		entry.Request.Headers = make(http.Header)
 		entry.Response.Headers = make(http.Header)
 		return entry
 	}
 
 	db := d.db
-	rows, err := db.Query(`
+	rows, err := db.QueryContext(ctx, `
 			SELECT rh.id, rh.method, rh.request_body, rh.response_body, rh.created_at,
 			       h.is_request, h.key, hv.header_value
 			FROM requests_history rh
-			    JOIN headers h on rh.id = h.request_id
+			    JOIN headers h on rh.id = h.request_history_id
 				JOIN headers_values hv ON hv.header_id = h.id
 			ORDER BY rh.id, h.id;
 	`)
@@ -122,7 +132,7 @@ func (d *Database) GetHistory() ([]RequestHistoryEntry, error) {
 		return nil, err
 	}
 
-	res := make([]RequestHistoryEntry, 0)
+	res := make([]models.RequestHistoryEntry, 0)
 	cur := newHistoryEntry()
 
 	for rows.Next() {
@@ -163,4 +173,25 @@ func (d *Database) GetHistory() ([]RequestHistoryEntry, error) {
 	}
 
 	return res, nil
+}
+
+func (d *Database) CreateRequest(ctx context.Context, request *models.NewRequestRequest) (int64, error) {
+	r, err := d.db.ExecContext(ctx,
+		`
+		INSERT INTO requests(name, request_body, user_id, created_at, method) VALUES ($1, $2, 1, $3, $4)
+	`, request.Name, request.Request.Body, time.Now().Unix(), request.Request.Method)
+	if err != nil {
+		return 0, err
+	}
+	id, err := r.LastInsertId()
+	if err != nil {
+		log.Println("Error fetching last row id: " + err.Error())
+		return 0, err
+	}
+
+	err = insertHeadersValues(ctx, d.db, 0, id, request.Request.Headers, false)
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
 }

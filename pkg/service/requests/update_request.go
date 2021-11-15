@@ -1,14 +1,14 @@
 package requests
 
 import (
-	"github.com/impulse-http/local-backend/pkg"
+	"github.com/impulse-http/local-backend/pkg/models"
 	"github.com/impulse-http/local-backend/pkg/service"
 	"net/http"
 )
 
 type UpdateRequestRequest struct {
-	Name    string          `json:"name"`
-	Request pkg.RequestType `json:"request"`
+	Name    string             `json:"name"`
+	Request models.RequestType `json:"request"`
 }
 
 type UpdateRequestResponse struct {
