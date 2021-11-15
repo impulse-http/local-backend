@@ -7,7 +7,7 @@ import (
 
 type ErrorMessage struct {
 	Message string            `json:"message"`
-	Details map[string]string `json:"details."`
+	Details map[string]string `json:"details"`
 }
 
 func WriteJSONError(w http.ResponseWriter, message string, code int) {

@@ -14,17 +14,18 @@ CREATE TABLE user
 
 CREATE TABLE headers_values
 (
-    id        INTEGER PRIMARY KEY,
-    header_id INTEGER,
+    id           INTEGER PRIMARY KEY,
+    header_id    INTEGER,
+    header_value text,
     FOREIGN KEY (header_id) REFERENCES headers (id)
 );
 
 CREATE TABLE headers
 (
     id         INTEGER PRIMARY KEY,
-    type       int,
     key        text,
     request_id INTEGER,
+    is_request INTEGER,
     FOREIGN KEY (request_id) REFERENCES requests_history (id)
 );
 
@@ -35,6 +36,7 @@ CREATE TABLE requests_history
     response_body blob,
     user_id       INTEGER,
     created_at    timestamp,
+    method        string,
     FOREIGN KEY (user_id) REFERENCES user (id)
 );
 
