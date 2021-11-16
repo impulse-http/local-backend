@@ -42,14 +42,22 @@ CREATE TABLE requests_history
     FOREIGN KEY (user_id) REFERENCES user (id)
 );
 
+CREATE TABLE collections
+(
+    id   INTEGER PRIMARY KEY,
+    name text
+);
+
 CREATE TABLE requests
 (
-    id           INTEGER PRIMARY KEY,
-    name         text,
-    request_body blob,
-    user_id      INTEGER,
-    created_at   timestamp,
-    method       string
+    id            INTEGER PRIMARY KEY,
+    name          text,
+    request_body  blob,
+    user_id       INTEGER,
+    created_at    timestamp,
+    method        text,
+    collection_id INTEGER,
+    FOREIGN KEY (collection_id) REFERENCES collections (id)
 );
 -- +goose StatementEnd
 
@@ -60,4 +68,5 @@ DROP TABLE user;
 DROP TABLE requests_history;
 DROP TABLE headers_values;
 DROP TABLE headers;
+DROP TABLE collections;
 -- +goose StatementEnd
