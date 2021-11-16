@@ -1,14 +1,25 @@
 SHELL := /usr/bin/env bash
 
-.PHONY: database
-database:
-	@echo "Initializing database"
+.PHONY: initdb
+initdb:
+	@echo "Initializing database..."
 	cd migrations; goose sqlite3 ../dist/impulse.db up
+
+.PHONY: dropdb
+dropdb:
+	@echo "Dropping database..."
+	rm -f dist/impulse.db
+
+.PHONY: reinitdb
+reinitdb:
+	@echo "Reinitializing database..."
+	make dropdb
+	make initdb
 
 .PHONY: start-dev
 start-dev:
 	@echo "Starting development server..."
-	make database
+	make initdb
 	go build -o dist/service cmd/main.go
 	./dist/service
 

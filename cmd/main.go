@@ -5,6 +5,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/impulse-http/local-backend/pkg/database"
 	"github.com/impulse-http/local-backend/pkg/service"
+	"github.com/impulse-http/local-backend/pkg/service/collections"
 	"github.com/impulse-http/local-backend/pkg/service/requests"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
@@ -23,6 +24,7 @@ func main() {
 	r := mux.NewRouter()
 
 	requests.AddRequestHandlers(s, r)
+	collections.AddCollectionsHandlers(s, r)
 
 	log.Println("Running at localhost:8090")
 	http.Handle("/", r)
