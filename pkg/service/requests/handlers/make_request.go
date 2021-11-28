@@ -1,11 +1,9 @@
-package requests
+package handlers
 
 import (
 	"bytes"
-	"encoding/json"
 	"github.com/impulse-http/local-backend/pkg/models"
 	"github.com/impulse-http/local-backend/pkg/service"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
@@ -24,17 +22,9 @@ type CallResponse struct {
 func MakeRequestSendHandler(s *service.Service) service.Handler {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		body, err := ioutil.ReadAll(req.Body)
-		if err != nil {
-			log.Println(err)
+		requestJson := CallRequest{}
+		if err := service.ReadJsonRequest(req, &requestJson); err != nil {
 			service.WriteJSONError(w, "failed to read body", 500)
-			return
-		}
-
-		var requestJson CallRequest
-		if err := json.Unmarshal(body, &requestJson); err != nil {
-			log.Println(err)
-			service.WriteJSONError(w, "error while unmarshall json", 500)
 			return
 		}
 		method := strings.ToUpper(requestJson.Request.Method)

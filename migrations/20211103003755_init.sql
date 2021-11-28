@@ -17,7 +17,7 @@ CREATE TABLE headers_values
     id           INTEGER PRIMARY KEY,
     header_id    INTEGER,
     header_value text,
-    FOREIGN KEY (header_id) REFERENCES headers (id)
+    FOREIGN KEY (header_id) REFERENCES headers (id) ON DELETE CASCADE
 );
 
 CREATE TABLE headers
@@ -27,8 +27,8 @@ CREATE TABLE headers
     request_history_id INTEGER,
     request_id         INTEGER,
     is_request         INTEGER,
-    FOREIGN KEY (request_history_id) REFERENCES requests_history (id),
-    FOREIGN KEY (request_id) REFERENCES requests (id)
+    FOREIGN KEY (request_history_id) REFERENCES requests_history (id) ON DELETE CASCADE,
+    FOREIGN KEY (request_id) REFERENCES requests (id) ON DELETE CASCADE
 );
 
 CREATE TABLE requests_history
@@ -42,14 +42,22 @@ CREATE TABLE requests_history
     FOREIGN KEY (user_id) REFERENCES user (id)
 );
 
+CREATE TABLE collections
+(
+    id   INTEGER PRIMARY KEY,
+    name text
+);
+
 CREATE TABLE requests
 (
-    id           INTEGER PRIMARY KEY,
-    name         text,
-    request_body blob,
-    user_id      INTEGER,
-    created_at   timestamp,
-    method       string
+    id            INTEGER PRIMARY KEY,
+    name          text,
+    request_body  blob,
+    user_id       INTEGER,
+    created_at    timestamp,
+    method        text,
+    collection_id INTEGER,
+    FOREIGN KEY (collection_id) REFERENCES collections (id)
 );
 -- +goose StatementEnd
 
@@ -60,4 +68,5 @@ DROP TABLE user;
 DROP TABLE requests_history;
 DROP TABLE headers_values;
 DROP TABLE headers;
+DROP TABLE collections;
 -- +goose StatementEnd

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func insertHeadersValues(ctx context.Context, db *sql.DB, requestHistoryId, requestId int64, headers map[string][]string, isRequest bool) error {
+func insertHeadersValues(ctx context.Context, db *sql.DB, requestHistoryId, requestId int64, headers http.Header, isRequest bool) error {
 	query := `
 			INSERT INTO headers (key, request_history_id, is_request)
 			VALUES ($1, $2, $3);
@@ -61,6 +61,67 @@ func insertHeadersValues(ctx context.Context, db *sql.DB, requestHistoryId, requ
 	}
 
 	return nil
+}
+
+func deleteHeadersValues(ctx context.Context, db *sql.DB, requestHistoryId, requestId int64) error {
+	query := `DELETE FROM headers WHERE request_history_id = $1`
+	deleteId := requestHistoryId
+	if requestId > 0 {
+		query = `DELETE FROM headers WHERE request_id = $1`
+		deleteId = requestId
+	}
+	_, err := db.ExecContext(ctx, query, deleteId)
+	return err
+}
+
+func updateRequestHeadersValues(ctx context.Context, db *sql.DB, requestId int64, reqHeaders http.Header) error {
+	if err := deleteHeadersValues(ctx, db, 0, requestId); err != nil {
+		return err
+	}
+	if err := insertHeadersValues(ctx, db, 0, requestId, reqHeaders, true); err != nil {
+		return err
+	}
+	return nil
+}
+
+func getRequestHeaders(ctx context.Context, db *sql.DB, requestHistoryId, requestId int64) (http.Header, http.Header, error) {
+	query := `
+		SELECT h.key, hv.header_value, h.is_request
+		FROM headers h JOIN headers_values hv ON h.id = hv.header_id
+		WHERE h.request_history_id = $1
+	`
+	getId := requestHistoryId
+
+	if requestId > 0 {
+		query = `
+			SELECT h.key, hv.header_value, h.is_request
+			FROM headers h JOIN headers_values hv ON h.id = hv.header_id
+			WHERE request_id = $1
+		`
+		getId = requestId
+	}
+
+	r, err := db.QueryContext(ctx, query, getId)
+
+	reqHeaders := make(http.Header)
+	resHeaders := make(http.Header)
+	key := ""
+	value := ""
+	isRequest := 0
+
+	for r.Next() {
+		if err := r.Scan(&key, &value, &isRequest); err != nil {
+			return nil, nil, err
+		}
+
+		if intToBool(isRequest) {
+			reqHeaders[key] = append(reqHeaders[key], value)
+		} else {
+			resHeaders[key] = append(resHeaders[key], value)
+		}
+	}
+
+	return reqHeaders, resHeaders, err
 }
 
 func (d *Database) CreateHistoryEntry(ctx context.Context, req *models.RequestType, res *models.ResponseType) (int64, error) {
@@ -175,11 +236,30 @@ func (d *Database) GetHistory(ctx context.Context) ([]models.RequestHistoryEntry
 	return res, nil
 }
 
-func (d *Database) CreateRequest(ctx context.Context, request *models.NewRequestRequest) (int64, error) {
-	r, err := d.db.ExecContext(ctx,
+func (d *Database) CreateRequest(ctx context.Context, request *models.Request) (int64, error) {
+	query := `INSERT INTO requests(name, request_body, user_id, created_at, method) VALUES ($1, $2, 1, $3, $4)`
+	if request.CollectionId > 0 {
+		query = `
+			INSERT INTO requests(
+				 name,
+				 request_body,
+				 user_id,
+				 created_at,
+				 method,
+				 collection_id
+			)
+			VALUES ($1, $2, 1, $3, $4, $5)
 		`
-		INSERT INTO requests(name, request_body, user_id, created_at, method) VALUES ($1, $2, 1, $3, $4)
-	`, request.Name, request.Request.Body, time.Now().Unix(), request.Request.Method)
+	}
+	r, err := d.db.ExecContext(
+		ctx,
+		query,
+		request.Name,
+		request.Request.Body,
+		time.Now().Unix(),
+		request.Request.Method,
+		request.CollectionId,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -189,9 +269,98 @@ func (d *Database) CreateRequest(ctx context.Context, request *models.NewRequest
 		return 0, err
 	}
 
-	err = insertHeadersValues(ctx, d.db, 0, id, request.Request.Headers, false)
+	err = insertHeadersValues(ctx, d.db, 0, id, request.Request.Headers, true)
 	if err != nil {
 		return 0, err
 	}
 	return id, nil
+}
+
+func (d *Database) GetRequests(ctx context.Context, collectionId int64) ([]models.RequestEntry, error) {
+	query := `
+		SELECT id, name, request_body, created_at
+		FROM requests
+		WHERE collection_id is null
+	`
+
+	if collectionId > 0 {
+		query = `
+			SELECT id, name, request_body, created_at
+			FROM requests
+			WHERE collection_id = $1
+		`
+	}
+	r, err := d.db.QueryContext(
+		ctx,
+		query,
+		collectionId,
+	)
+	if err != nil {
+		log.Println("Error while getting requests" + err.Error())
+		return nil, err
+	}
+	res := make([]models.RequestEntry, 0)
+	for r.Next() {
+		e := models.RequestEntry{}
+		err = r.Scan(&e.Id, &e.Name, &e.Request.Body, &e.CreatedAt)
+		if err != nil {
+			log.Println("Error while scanning request fields" + err.Error())
+			return nil, err
+		}
+		res = append(res, e)
+	}
+	return res, nil
+}
+
+func (d *Database) DeleteRequest(ctx context.Context, id int64) error {
+	_, err := d.db.ExecContext(ctx, "DELETE FROM requests WHERE id = $1", id)
+	if err != nil {
+		log.Println("Error while executing the query...")
+	}
+	return err
+}
+
+func (d *Database) UpdateRequest(ctx context.Context, id int64, req *models.Request) (*models.StoredRequest, error) {
+	_, err := d.db.ExecContext(ctx,
+		`
+		UPDATE requests
+		SET name = $2,
+		  	request_body = $3,
+		  	method = $4
+		WHERE id = $1
+		`,
+		id,
+		req.Name,
+		req.Request.Body,
+		req.Request.Method,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err = updateRequestHeadersValues(ctx, d.db, id, req.Request.Headers); err != nil {
+		return nil, err
+	}
+	return &models.StoredRequest{Id: int(id), Name: req.Name, Request: req.Request}, nil
+}
+
+func (d *Database) GetRequest(ctx context.Context, id int64) (*models.StoredRequest, error) {
+	r := d.db.QueryRowContext(
+		ctx,
+		`
+		SELECT id, name, request_body, created_at
+		FROM requests
+		WHERE id = $1
+		`,
+		id,
+	)
+	req := models.StoredRequest{}
+	if err := r.Scan(&req.Id, &req.Name, &req.Request.Body); err != nil {
+		return nil, err
+	}
+	reqHeaders, _, err := getRequestHeaders(ctx, d.db, 0, id)
+	if err != nil {
+		return nil, err
+	}
+	req.Request.Headers = reqHeaders
+	return &req, nil
 }

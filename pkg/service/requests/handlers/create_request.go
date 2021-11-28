@@ -1,10 +1,8 @@
-package requests
+package handlers
 
 import (
-	"encoding/json"
 	"github.com/impulse-http/local-backend/pkg/models"
 	"github.com/impulse-http/local-backend/pkg/service"
-	"io/ioutil"
 	"log"
 	"net/http"
 )
@@ -12,30 +10,23 @@ import (
 func MakeNewRequestHandler(s *service.Service) service.Handler {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-
-		body, err := ioutil.ReadAll(req.Body)
-		if err != nil {
+		request := &models.Request{}
+		if err := service.ReadJsonRequest(req, request); err != nil {
 			log.Println(err)
 			service.WriteJSONError(w, "failed to read body", 500)
 			return
 		}
 
-		var requestJson models.NewRequestRequest
-		if err := json.Unmarshal(body, &requestJson); err != nil {
-			log.Println(err)
-			service.WriteJSONError(w, "error while unmarshall json", 500)
-			return
-		}
-
-		requestId, err := s.DB.CreateRequest(ctx, &requestJson)
+		requestId, err := s.DB.CreateRequest(ctx, request)
 		if err != nil {
 			log.Println(err)
 			service.WriteJSONError(w, "error while creating request "+err.Error(), 500)
 			return
 		}
-		service.WriteJsonResponse(w, models.NewRequestResponse{
-			Id:   int(requestId),
-			Name: requestJson.Name,
+		service.WriteJsonResponse(w, models.StoredRequest{
+			Id:      int(requestId),
+			Name:    request.Name,
+			Request: request.Request,
 		})
 	}
 }
