@@ -236,21 +236,18 @@ func (d *Database) GetHistory(ctx context.Context) ([]models.RequestHistoryEntry
 	return res, nil
 }
 
-func (d *Database) CreateRequest(ctx context.Context, request *models.Request) (int64, error) {
-	query := `INSERT INTO requests(name, request_body, user_id, created_at, method) VALUES ($1, $2, 1, $3, $4)`
-	if request.CollectionId > 0 {
-		query = `
-			INSERT INTO requests(
-				 name,
-				 request_body,
-				 user_id,
-				 created_at,
-				 method,
-				 collection_id
-			)
-			VALUES ($1, $2, 1, $3, $4, $5)
-		`
-	}
+func (d *Database) CreateRequest(ctx context.Context, request *models.Request, collectionId int64) (int64, error) {
+	query := `
+		 INSERT INTO requests(
+			  name,
+			  request_body,
+			  user_id,
+			  created_at,
+			  method,
+			  collection_id
+		 )
+		 VALUES ($1, $2, 1, $3, $4, $5)
+	`
 	r, err := d.db.ExecContext(
 		ctx,
 		query,
@@ -258,7 +255,7 @@ func (d *Database) CreateRequest(ctx context.Context, request *models.Request) (
 		request.Request.Body,
 		time.Now().Unix(),
 		request.Request.Method,
-		request.CollectionId,
+		collectionId,
 	)
 	if err != nil {
 		return 0, err
@@ -278,14 +275,14 @@ func (d *Database) CreateRequest(ctx context.Context, request *models.Request) (
 
 func (d *Database) GetRequests(ctx context.Context, collectionId int64) ([]models.RequestEntry, error) {
 	query := `
-		SELECT id, name, request_body, created_at
+		SELECT id, name, request_body, created_at, method
 		FROM requests
 		WHERE collection_id is null
 	`
 
 	if collectionId > 0 {
 		query = `
-			SELECT id, name, request_body, created_at
+			SELECT id, name, request_body, created_at, method
 			FROM requests
 			WHERE collection_id = $1
 		`
@@ -302,7 +299,7 @@ func (d *Database) GetRequests(ctx context.Context, collectionId int64) ([]model
 	res := make([]models.RequestEntry, 0)
 	for r.Next() {
 		e := models.RequestEntry{}
-		err = r.Scan(&e.Id, &e.Name, &e.Request.Body, &e.CreatedAt)
+		err = r.Scan(&e.Id, &e.Name, &e.Request.Body, &e.CreatedAt, &e.Request.Method)
 		if err != nil {
 			log.Println("Error while scanning request fields" + err.Error())
 			return nil, err

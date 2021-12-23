@@ -20,3 +20,9 @@ type StoredCollection struct {
 	Id   int64  `json:"id"`
 	Name string `json:"name"`
 }
+
+type ListCollection struct {
+	Id            int64  `json:"id"`
+	Name          string `json:"name"`
+	RequestsCount int64  `json:"requests"`
+}

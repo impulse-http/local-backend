@@ -8,6 +8,7 @@ import (
 	"github.com/impulse-http/local-backend/pkg/service/collections"
 	"github.com/impulse-http/local-backend/pkg/service/requests"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/rs/cors"
 	"log"
 	"net/http"
 )
@@ -22,11 +23,16 @@ func main() {
 
 	s := service.NewService(dbWrapper)
 	r := mux.NewRouter()
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:8080"},
+		AllowCredentials: true,
+	})
 
 	requests.AddRequestHandlers(s, r)
 	collections.AddCollectionsHandlers(s, r)
 
 	log.Println("Running at localhost:8090")
 	http.Handle("/", r)
-	_ = http.ListenAndServe(":8090", nil)
+	handler := c.Handler(r)
+	_ = http.ListenAndServe(":8090", handler)
 }

@@ -8,8 +8,6 @@ import (
 
 func AddRequestHandlers(s *service.Service, r *mux.Router) {
 	r.HandleFunc("/requests/bare/make/", handlers.MakeRequestSendHandler(s)).Methods("POST")
-	r.HandleFunc("/requests/", handlers.MakeNewRequestHandler(s)).Methods("POST")
-	r.HandleFunc("/requests/", handlers.MakeListRequestHandler(s)).Methods("GET")
 	r.HandleFunc("/requests/{id:[0-9]+}/", handlers.MakeGetRequestHandler(s)).Methods("GET")
 	r.HandleFunc("/requests/{id:[0-9]+}/", handlers.MakeUpdateRequestHandler(s)).Methods("PUT")
 	r.HandleFunc("/requests/{id:[0-9]+}/", handlers.MakeDeleteRequestHandler(s)).Methods("DELETE")

@@ -3,6 +3,7 @@ SHELL := /usr/bin/env bash
 .PHONY: initdb
 initdb:
 	@echo "Initializing database..."
+	mkdir -p dist
 	cd migrations; goose sqlite3 ../dist/impulse.db up
 
 .PHONY: dropdb

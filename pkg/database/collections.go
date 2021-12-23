@@ -35,16 +35,24 @@ func (d *Database) DeleteCollection(ctx context.Context, id int64) error {
 	return err
 }
 
-func (d *Database) ListCollections(ctx context.Context) ([]models.StoredCollection, error) {
-	r, err := d.db.QueryContext(ctx, "SELECT id, name FROM collections;")
+func (d *Database) ListCollections(ctx context.Context) ([]models.ListCollection, error) {
+	r, err := d.db.QueryContext(
+		ctx,
+		`
+			SELECT c.id, c.name, count(r.id)
+			FROM collections c
+			LEFT JOIN requests r on c.id = r.collection_id
+			GROUP BY c.id, c.name;
+			`,
+	)
 	if err != nil {
 		log.Println("Error while getting the list of collections...")
 		return nil, err
 	}
-	res := make([]models.StoredCollection, 0)
+	res := make([]models.ListCollection, 0)
 	for r.Next() {
-		c := models.StoredCollection{}
-		err = r.Scan(&c.Id, &c.Name)
+		c := models.ListCollection{}
+		err = r.Scan(&c.Id, &c.Name, &c.RequestsCount)
 		if err != nil {
 			log.Println("Error while scanning collection...")
 			return nil, err
