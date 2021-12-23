@@ -15,6 +15,9 @@ import (
 
 func main() {
 	db, err := sql.Open("sqlite3", "dist/impulse.db")
+	if _, err := db.Exec("PRAGMA foreign_keys=ON"); err != nil {
+		log.Fatal(err)
+	}
 	if err != nil {
 		log.Fatal("cannot create sqlite3 db")
 	}

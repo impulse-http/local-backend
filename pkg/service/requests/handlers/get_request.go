@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/impulse-http/local-backend/pkg/service"
 	"net/http"
@@ -18,6 +19,7 @@ func MakeGetRequestHandler(s *service.Service) service.Handler {
 		}
 		response, err := s.DB.GetRequest(ctx, id)
 		if err != nil {
+			fmt.Println(err)
 			service.WriteJSONError(writer, "Couldn't get request", 500)
 			return
 		}

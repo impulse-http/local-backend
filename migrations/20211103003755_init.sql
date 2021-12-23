@@ -34,12 +34,12 @@ CREATE TABLE headers
 CREATE TABLE requests_history
 (
     id            INTEGER PRIMARY KEY,
+    url           text,
     request_body  blob,
     response_body blob,
-    user_id       INTEGER,
+    user_id       INTEGER NULL,
     created_at    timestamp,
-    method        string,
-    FOREIGN KEY (user_id) REFERENCES user (id)
+    method        string
 );
 
 CREATE TABLE collections
@@ -51,9 +51,10 @@ CREATE TABLE collections
 CREATE TABLE requests
 (
     id            INTEGER PRIMARY KEY,
+    url           text,
     name          text,
-    request_body  blob,
-    user_id       INTEGER,
+    request_body  text,
+    user_id       INTEGER NULL,
     created_at    timestamp,
     method        text,
     collection_id INTEGER,

@@ -128,13 +128,14 @@ func (d *Database) CreateHistoryEntry(ctx context.Context, req *models.RequestTy
 	db := d.db
 	r, err := db.ExecContext(ctx,
 		`
-		INSERT INTO requests_history (request_body, response_body, user_id, created_at, method)
-		VALUES ($1, $2, 1, $3, $4)
+		INSERT INTO requests_history (request_body, response_body, user_id, created_at, method, url)
+		VALUES ($1, $2, 1, $3, $4, $5)
 		`,
 		req.Body,
 		res.Body,
 		time.Now().Unix(),
 		req.Method,
+		req.Url,
 	)
 	if err != nil {
 		log.Println("Error running query: " + err.Error())
@@ -169,6 +170,7 @@ func (d *Database) GetHistory(ctx context.Context) ([]models.RequestHistoryEntry
 		IsRequest    int
 		HeaderKey    string
 		HeaderValue  string
+		Url          string
 	}
 
 	newHistoryEntry := func() models.RequestHistoryEntry {
@@ -181,7 +183,7 @@ func (d *Database) GetHistory(ctx context.Context) ([]models.RequestHistoryEntry
 	db := d.db
 	rows, err := db.QueryContext(ctx, `
 			SELECT rh.id, rh.method, rh.request_body, rh.response_body, rh.created_at,
-			       h.is_request, h.key, hv.header_value
+			       h.is_request, h.key, hv.header_value, rh.url
 			FROM requests_history rh
 			    JOIN headers h on rh.id = h.request_history_id
 				JOIN headers_values hv ON hv.header_id = h.id
@@ -207,6 +209,7 @@ func (d *Database) GetHistory(ctx context.Context) ([]models.RequestHistoryEntry
 			&row.IsRequest,
 			&row.HeaderKey,
 			&row.HeaderValue,
+			&row.Url,
 		)
 
 		if err != nil {
@@ -219,6 +222,7 @@ func (d *Database) GetHistory(ctx context.Context) ([]models.RequestHistoryEntry
 				cur.CreatedAt = row.CreatedAt
 				cur.Request.Body = row.Body
 				cur.Request.Method = row.Method
+				cur.Request.Url = row.Url
 				cur.Response.Body = row.ResponseBody
 			}
 
@@ -244,9 +248,10 @@ func (d *Database) CreateRequest(ctx context.Context, request *models.Request, c
 			  user_id,
 			  created_at,
 			  method,
-			  collection_id
+			  collection_id,
+              url
 		 )
-		 VALUES ($1, $2, 1, $3, $4, $5)
+		 VALUES ($1, $2, 1, $3, $4, $5, $6)
 	`
 	r, err := d.db.ExecContext(
 		ctx,
@@ -256,6 +261,7 @@ func (d *Database) CreateRequest(ctx context.Context, request *models.Request, c
 		time.Now().Unix(),
 		request.Request.Method,
 		collectionId,
+		request.Request.Url,
 	)
 	if err != nil {
 		return 0, err
@@ -275,18 +281,19 @@ func (d *Database) CreateRequest(ctx context.Context, request *models.Request, c
 
 func (d *Database) GetRequests(ctx context.Context, collectionId int64) ([]models.RequestEntry, error) {
 	query := `
-		SELECT id, name, request_body, created_at, method
+		SELECT id, name, request_body, created_at, method, url
 		FROM requests
 		WHERE collection_id is null
 	`
 
 	if collectionId > 0 {
 		query = `
-			SELECT id, name, request_body, created_at, method
+			SELECT id, name, request_body, created_at, method, url
 			FROM requests
 			WHERE collection_id = $1
 		`
 	}
+
 	r, err := d.db.QueryContext(
 		ctx,
 		query,
@@ -299,7 +306,7 @@ func (d *Database) GetRequests(ctx context.Context, collectionId int64) ([]model
 	res := make([]models.RequestEntry, 0)
 	for r.Next() {
 		e := models.RequestEntry{}
-		err = r.Scan(&e.Id, &e.Name, &e.Request.Body, &e.CreatedAt, &e.Request.Method)
+		err = r.Scan(&e.Id, &e.Name, &e.Request.Body, &e.CreatedAt, &e.Request.Method, &e.Request.Url)
 		if err != nil {
 			log.Println("Error while scanning request fields" + err.Error())
 			return nil, err
@@ -321,15 +328,15 @@ func (d *Database) UpdateRequest(ctx context.Context, id int64, req *models.Requ
 	_, err := d.db.ExecContext(ctx,
 		`
 		UPDATE requests
-		SET name = $2,
-		  	request_body = $3,
-		  	method = $4
-		WHERE id = $1
+		SET name = ?,
+		  	request_body = ?,
+		  	method = ? 
+		WHERE id = ? 
 		`,
-		id,
 		req.Name,
 		req.Request.Body,
 		req.Request.Method,
+		id,
 	)
 	if err != nil {
 		return nil, err
@@ -344,14 +351,14 @@ func (d *Database) GetRequest(ctx context.Context, id int64) (*models.StoredRequ
 	r := d.db.QueryRowContext(
 		ctx,
 		`
-		SELECT id, name, request_body, created_at
+		SELECT id, name, request_body, url, method
 		FROM requests
 		WHERE id = $1
 		`,
 		id,
 	)
 	req := models.StoredRequest{}
-	if err := r.Scan(&req.Id, &req.Name, &req.Request.Body); err != nil {
+	if err := r.Scan(&req.Id, &req.Name, &req.Request.Body, &req.Request.Url, &req.Request.Method); err != nil {
 		return nil, err
 	}
 	reqHeaders, _, err := getRequestHeaders(ctx, d.db, 0, id)
