@@ -2,11 +2,12 @@ package requests
 
 import (
 	"encoding/json"
-	"github.com/impulse-http/local-backend/pkg/models"
-	"github.com/impulse-http/local-backend/pkg/service"
 	"io/ioutil"
 	"log"
 	"net/http"
+
+	"github.com/impulse-http/local-backend/pkg/models"
+	"github.com/impulse-http/local-backend/pkg/service"
 )
 
 func MakeNewRequestHandler(s *service.Service) service.Handler {

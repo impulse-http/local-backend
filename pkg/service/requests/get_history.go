@@ -2,10 +2,11 @@ package requests
 
 import (
 	"fmt"
-	"github.com/impulse-http/local-backend/pkg/models"
-	"github.com/impulse-http/local-backend/pkg/service"
 	"log"
 	"net/http"
+
+	"github.com/impulse-http/local-backend/pkg/models"
+	"github.com/impulse-http/local-backend/pkg/service"
 )
 
 type RequestHistoryResponse struct {
@@ -20,6 +21,7 @@ func MakeGetHistoryRequestHandler(s *service.Service) service.Handler {
 		if err != nil {
 			log.Println("Couldn't get history" + fmt.Sprint(err))
 			service.WriteJSONError(writer, "error while reading from db", 500)
+			return
 		}
 		service.WriteJsonResponse(writer, RequestHistoryResponse{Entries: history})
 	}

@@ -10,3 +10,6 @@ type RequestHistoryEntry struct {
 	Request   RequestType  `json:"request"`
 	Response  ResponseType `json:"response"`
 }
+
+type Request struct {
+}

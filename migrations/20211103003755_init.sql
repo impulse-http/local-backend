@@ -46,6 +46,7 @@ CREATE TABLE requests
 (
     id           INTEGER PRIMARY KEY,
     name         text,
+    url          text,
     request_body blob,
     user_id      INTEGER,
     created_at   timestamp,

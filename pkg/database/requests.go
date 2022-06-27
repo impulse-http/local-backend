@@ -4,10 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/impulse-http/local-backend/pkg/models"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/pkg/errors"
+
+	"github.com/impulse-http/local-backend/pkg/models"
 )
 
 func insertHeadersValues(ctx context.Context, db *sql.DB, requestHistoryId, requestId int64, headers map[string][]string, isRequest bool) error {
@@ -178,8 +181,8 @@ func (d *Database) GetHistory(ctx context.Context) ([]models.RequestHistoryEntry
 func (d *Database) CreateRequest(ctx context.Context, request *models.NewRequestRequest) (int64, error) {
 	r, err := d.db.ExecContext(ctx,
 		`
-		INSERT INTO requests(name, request_body, user_id, created_at, method) VALUES ($1, $2, 1, $3, $4)
-	`, request.Name, request.Request.Body, time.Now().Unix(), request.Request.Method)
+		INSERT INTO requests(name, url, request_body, user_id, created_at, method) VALUES ($1, $2, 1, $3, $4)
+	`, request.Name, request.Request.Url, request.Request.Body, time.Now().Unix(), request.Request.Method)
 	if err != nil {
 		return 0, err
 	}
@@ -194,4 +197,40 @@ func (d *Database) CreateRequest(ctx context.Context, request *models.NewRequest
 		return 0, err
 	}
 	return id, nil
+}
+
+func (d *Database) DeleteRequest(ctx context.Context, id int64) error {
+	_, err := d.db.ExecContext(ctx,
+		`
+			DELETE FROM requests WHERE id = $1
+	`, id)
+	if err != nil {
+		return errors.Wrap(err, "delete request")
+	}
+
+	return nil
+}
+
+func (d *Database) GetListRequests(ctx context.Context) ([]*models.NewRequestRequest, error) {
+	rows, err := d.db.QueryContext(ctx, `SELECT id, name, request_body, user_id, method FROM requests`)
+	if err != nil {
+		return nil, errors.Wrap(err, "error while select")
+	}
+	ret := make([]*models.NewRequestRequest, 0)
+	for rows.Next() {
+		item := &models.NewRequestRequest{}
+		err := rows.Scan(
+			&item.Request.Id,
+			&item.Name,
+			&item.Request.Body,
+			&item.Request.Id,
+			&item.Request.Method,
+		)
+		if err != nil {
+			return nil, err
+		}
+		ret = append(ret, item)
+	}
+
+	return ret, nil
 }
